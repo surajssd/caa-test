@@ -1,0 +1,59 @@
+name: build-caa-image
+
+env:
+  ACR_REGISTRY: upstreamcaa
+  ACR_URL: upstreamcaa.azurecr.io
+
+on:
+  push:
+    branches:
+      - main
+      - kartikjoshi21/ci-upstream
+
+jobs:
+  build-caa-image:
+    runs-on: ubuntu-latest
+    environment: build
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Docker login
+      run: |
+        TOKEN=$(az acr login --name "$ACR_REGISTRY" --expose-token --output tsv --query accessToken)
+        docker login "$ACR_URL" --username 00000000-0000-0000-0000-000000000000 --password "$TOKEN"
+
+    - name: Clone CAA repo
+      env:
+        CAA_REPO_URL: https://github.com/confidential-containers/cloud-api-adaptor
+        CAA_REPO_BRANCH: staging
+      run:  git clone "$CAA_REPO_URL" -b "$CAA_REPO_BRANCH" build
+
+    - name: Build and push CAA docker image
+      env:
+        registry: ${{ env.ACR_URL }}
+        CLOUD_PROVIDER: azure
+      working-directory: build
+      run: |
+        docker buildx create --name multiarch --driver docker-container --use
+        make image
+
+  cleanup-resources:
+    runs-on: ubuntu-latest
+    environment: build
+    needs:
+      - build-caa-image
+
+    steps:
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Remove caa docker image
+      run: |
+        az acr repository delete --name  "$ACR_REGISTRY" --image cloud-api-adaptor:latest --yes

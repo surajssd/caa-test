@@ -1,0 +1,31 @@
+name: Login to Azure
+description: Login via Service Principal
+inputs:
+  client-id:
+    required: true
+    description: Client (App) Id
+  client-secret:
+    required: true
+    description: Client Secret
+  subscription-id:
+    required: true
+    description: Subscription Id
+  tenant-id:
+    required: true
+    description: Tenant Id
+
+runs:
+  using: composite
+  steps:
+  - name: Log in with Azure
+    uses: azure/login@v1
+    with:
+      # This way the individual secrets are masked in the output if
+      # they appear in the workflow logs.
+      creds: >
+        {
+          "clientId":"${{ inputs.client-id }}",
+          "clientSecret":"${{ inputs.client-secret }}",
+          "subscriptionId":"${{ inputs.subscription-id }}",
+          "tenantId":"${{ inputs.tenant-id }}"
+        }

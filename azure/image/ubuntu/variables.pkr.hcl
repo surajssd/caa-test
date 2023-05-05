@@ -97,3 +97,21 @@ variable "plan_publisher" {
   default = ""
 }
 
+// shared gallery name
+variable "az_gallery_name" {
+  type    = string
+  default = "caaubntcvmsGallery"
+}
+
+// shared gallery image name
+variable "az_gallery_image_name" {
+  type    = string
+  default = "cc-image"
+}
+
+// shared gallery image version
+variable "az_gallery_image_version" {
+  type    = string
+  default = "0.0.1"
+}
+

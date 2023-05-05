@@ -1,0 +1,175 @@
+name: azure-e2e-test
+
+env:
+  PODVM_GALLERY_NAME: "podvm_gallery0"
+  PODVM_IMAGE_DEF_NAME: "podvm_image0"
+  PODVM_IMAGE_VERSION: "0.0.1"
+  PODVM_IMAGE_NAME: "peerpod-image-0.0.1"
+
+on:
+  push:
+    branches:
+      - staging
+      - kartikjoshi21/ci-upstream
+
+jobs:
+  build-caa-image:
+    runs-on: ubuntu-latest
+    environment: build
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: ./.github/actions/login-to-azure
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Docker login
+      run: |
+        TOKEN=$(az acr login --name ${{ secrets.ACR_URL }} --expose-token --output tsv --query accessToken)
+        docker login ${{ secrets.ACR_URL }} --username 00000000-0000-0000-0000-000000000000 --password "$TOKEN"
+
+    - name: Build and push CAA docker image
+      env:
+        registry: ${{ secrets.ACR_URL }}
+        CLOUD_PROVIDER: azure
+      run: |
+        docker buildx create --name multiarch --driver docker-container --use
+        make image
+
+  build-podvm-image:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: ./.github/actions/login-to-azure
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+
+    - uses: ./.github/actions/setup-azure-build-env
+
+    - name: Clone kata repository
+      run: |
+        pushd ../
+        git clone https://github.com/kata-containers/kata-containers -b CCv0
+        popd  
+
+    - name: Create podvm image
+      id: create-podvm-image
+      env:
+        PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+        PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+        PKR_VAR_resource_group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        PKR_VAR_location: ${{ secrets.AZURE_REGION }}
+        PKR_VAR_az_image_name: ${{ env.PODVM_IMAGE_NAME }}
+        PKR_VAR_vm_size: "Standard_D2as_v5" # use envs for this
+        PKR_VAR_ssh_username: "peerpod" # use envs for this
+        PKR_VAR_az_gallery_name: ${{ env.PODVM_GALLERY_NAME }}
+        PKR_VAR_az_gallery_image_name: ${{ env.PODVM_IMAGE_DEF_NAME }}
+        PKR_VAR_az_gallery_image_version: ${{ env.PODVM_IMAGE_VERSION }}
+        GOPATH: /home/runner/go
+        PODVM_DISTRO: "ubuntu"
+      run: |
+        pushd azure/image
+        make image
+        popd
+        
+  run-e2e-test:
+    runs-on: ubuntu-latest
+    needs:
+      - build-podvm-image
+      - build-caa-image
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: ./.github/actions/login-to-azure
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Create podvm image output
+      run: |
+        echo ${{ needs.build-podvm-image.outputs.imageid }}
+
+    - name: Create provisioner file
+      env:
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        RESOURCE_GROUP_NAME: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        CLUSTER_NAME: "e2e-test-cluster"
+        LOCATION: ${{ secrets.AZURE_REGION }}
+        SSH_KEY_ID: "id_rsa.pub"
+        CLOUD_PROVIDER: "azure"
+        PODVM_IMAGE_NAME: ${{ env.PODVM_IMAGE_NAME }}
+        TEST_E2E_CREATE_RG: "no"
+      run: |
+        cat << EOF > /tmp/provision_azure.properties
+          AZURE_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
+          AZURE_CLIENT_ID="$AZURE_CLIENT_ID"
+          AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET"
+          AZURE_TENANT_ID="$AZURE_TENANT_ID"
+          RESOURCE_GROUP_NAME="$RESOURCE_GROUP_NAME"
+          CLUSTER_NAME="$CLUSTER_NAME"
+          LOCATION="$LOCATION"
+          SSH_KEY_ID="$SSH_KEY_ID"
+          CLOUD_PROVIDER="$CLOUD_PROVIDER"
+          AZURE_IMAGE_ID="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP_NAME/providers/Microsoft.Compute/images/$PODVM_IMAGE_NAME"
+          IS_CI_MANAGED_CLUSTER="true"
+        EOF
+
+    - name: Run e2e test
+      env:
+        TEST_PROVISION_FILE: "/tmp/provision_azure.properties"
+        TEST_PROVISION: "yes"
+        CLOUD_PROVIDER: "azure"
+        BUILTIN_CLOUD_PROVIDERS: "azure"
+      run: | 
+        cat /tmp/provision_azure.properties
+        make test-e2e
+
+    - name: Remove provisioner file
+      run: |
+        rm -rf /tmp/provision_azure.properties
+
+  cleanup-resources:
+    runs-on: ubuntu-latest
+    environment: build
+    needs:
+      - build-caa-image
+      - build-podvm-image
+      - run-e2e-test
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: ./.github/actions/login-to-azure
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+
+    - name: Remove caa docker image
+      run: |
+        az acr repository delete --name  ${{ secrets.ACR_URL }} --image cloud-api-adaptor:latest --yes
+
+    - name: Remove podvm image
+      run: |
+        az sig image-version delete --gallery-name ${{ env.PODVM_GALLERY_NAME }} \
+                                    --gallery-image-definition ${{ env.PODVM_IMAGE_DEF_NAME }} \
+                                    --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+                                    --gallery-image-version ${{ env.PODVM_IMAGE_VERSION }}
+        az image delete --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+                        --name ${{ env.PODVM_IMAGE_NAME }}

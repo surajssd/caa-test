@@ -12,15 +12,12 @@ env:
   PODVM_IMAGE_NAME: "peerpod-image-0.0.1"
 
 on:
-  push:
-    branches:
-      - staging
-      - kartikjoshi21/ci-upstream
+  pull_request:
+    branches: [ "staging" ]
 
 jobs:
   build-caa-image:
     runs-on: ubuntu-latest
-    environment: build
     steps:
     - uses: actions/checkout@v3
 

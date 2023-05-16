@@ -25,3 +25,8 @@ runs:
           "subscriptionId":"${{ inputs.subscription-id }}",
           "tenantId":"${{ inputs.tenant-id }}"
         }
+
+  - name: Run az commands
+    shell: bash
+    run: |
+      az account show

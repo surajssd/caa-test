@@ -4,9 +4,6 @@ inputs:
   client-id:
     required: true
     description: Client (App) Id
-  client-secret:
-    required: true
-    description: Client Secret
   subscription-id:
     required: true
     description: Subscription Id
@@ -25,7 +22,6 @@ runs:
       creds: >
         {
           "clientId":"${{ inputs.client-id }}",
-          "clientSecret":"${{ inputs.client-secret }}",
           "subscriptionId":"${{ inputs.subscription-id }}",
           "tenantId":"${{ inputs.tenant-id }}"
         }

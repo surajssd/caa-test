@@ -3,6 +3,7 @@ name: azure-e2e-test
 env:
   PODVM_GALLERY_NAME: "podvm_gallery0"
   PODVM_IMAGE_DEF_NAME: "podvm_image0"
+  # TODO: These cannot be static, it has to be dynamic.
   PODVM_IMAGE_VERSION: "0.0.1"
   PODVM_IMAGE_NAME: "peerpod-image-0.0.1"
 
@@ -22,7 +23,6 @@ jobs:
     - uses: ./.github/actions/login-to-azure
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
 
@@ -47,7 +47,6 @@ jobs:
     - uses: ./.github/actions/login-to-azure
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
 
@@ -57,14 +56,13 @@ jobs:
       run: |
         pushd ../
         git clone https://github.com/kata-containers/kata-containers -b CCv0
-        popd  
+        popd
 
     - name: Create podvm image
       id: create-podvm-image
       env:
         PKR_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         PKR_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
-        PKR_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         PKR_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
         PKR_VAR_resource_group: ${{ secrets.AZURE_RESOURCE_GROUP }}
         PKR_VAR_location: ${{ secrets.AZURE_REGION }}
@@ -80,7 +78,7 @@ jobs:
         pushd azure/image
         make image
         popd
-        
+
   run-e2e-test:
     runs-on: ubuntu-latest
     needs:
@@ -92,7 +90,6 @@ jobs:
     - uses: ./.github/actions/login-to-azure
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
 
@@ -104,7 +101,6 @@ jobs:
       env:
         AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         RESOURCE_GROUP_NAME: ${{ secrets.AZURE_RESOURCE_GROUP }}
         CLUSTER_NAME: "e2e-test-cluster"
@@ -117,7 +113,6 @@ jobs:
         cat << EOF > /tmp/provision_azure.properties
           AZURE_SUBSCRIPTION_ID="$AZURE_SUBSCRIPTION_ID"
           AZURE_CLIENT_ID="$AZURE_CLIENT_ID"
-          AZURE_CLIENT_SECRET="$AZURE_CLIENT_SECRET"
           AZURE_TENANT_ID="$AZURE_TENANT_ID"
           RESOURCE_GROUP_NAME="$RESOURCE_GROUP_NAME"
           CLUSTER_NAME="$CLUSTER_NAME"
@@ -134,7 +129,7 @@ jobs:
         TEST_PROVISION: "yes"
         CLOUD_PROVIDER: "azure"
         BUILTIN_CLOUD_PROVIDERS: "azure"
-      run: | 
+      run: |
         cat /tmp/provision_azure.properties
         make test-e2e
 
@@ -157,7 +152,6 @@ jobs:
     - uses: ./.github/actions/login-to-azure
       with:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
 

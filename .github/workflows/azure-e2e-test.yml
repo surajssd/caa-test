@@ -1,5 +1,9 @@
 name: azure-e2e-test
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   PODVM_GALLERY_NAME: "podvm_gallery0"
   PODVM_IMAGE_DEF_NAME: "podvm_image0"

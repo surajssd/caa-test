@@ -6,6 +6,7 @@ package provisioner
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/profiles/latest/containerservice/mgmt/containerservice"
@@ -31,6 +32,7 @@ type AzureProperties struct {
 	SubnetID          string
 	ImageID           string
 	SshUserName       string
+	IsCIManaged       bool
 
 	InstanceSize string
 	NodeName     string
@@ -98,6 +100,14 @@ func initAzureProperties(properties map[string]string) error {
 	if AzureProps.ResourceGroupName == "" {
 		AzureProps.ResourceGroupName = AzureProps.ClusterName + "_rg"
 	}
+
+	CIManagedStr := properties["IS_CI_MANAGED_CLUSTER"]
+        if strings.EqualFold(CIManagedStr, "yes") || strings.EqualFold(CIManagedStr, "true") {
+                AzureProps.IsCIManaged = true
+        } else {
+                AzureProps.IsCIManaged = false
+	}
+
 
 	err := initManagedClients()
 	if err != nil {

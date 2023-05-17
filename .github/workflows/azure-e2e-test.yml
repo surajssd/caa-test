@@ -5,10 +5,9 @@ permissions:
   contents: read
 
 env:
-  PODVM_GALLERY_NAME: "podvm_gallery0"
-  PODVM_IMAGE_DEF_NAME: "podvm_image0"
-  # TODO: These cannot be static, it has to be dynamic.
   PODVM_IMAGE_VERSION: "0.0.1"
+  # TODO: These cannot be static, it has to be dynamic.
+  # pp-img-<pr_number>-<random_number>
   PODVM_IMAGE_NAME: "peerpod-image-0.0.1"
 
 on:
@@ -81,8 +80,8 @@ jobs:
         PKR_VAR_az_image_name: ${{ env.PODVM_IMAGE_NAME }}
         PKR_VAR_vm_size: "Standard_D2as_v5" # use envs for this
         PKR_VAR_ssh_username: "peerpod" # use envs for this
-        PKR_VAR_az_gallery_name: ${{ env.PODVM_GALLERY_NAME }}
-        PKR_VAR_az_gallery_image_name: ${{ env.PODVM_IMAGE_DEF_NAME }}
+        PKR_VAR_az_gallery_name: ${{ secrets.AZURE_PODVM_GALLERY_NAME }}
+        PKR_VAR_az_gallery_image_name: ${{ secrets.AZURE_PODVM_IMAGE_DEF_NAME }}
         PKR_VAR_az_gallery_image_version: ${{ env.PODVM_IMAGE_VERSION }}
         GOPATH: /home/runner/go
         PODVM_DISTRO: "ubuntu"
@@ -152,7 +151,6 @@ jobs:
 
   cleanup-resources:
     runs-on: ubuntu-latest
-    environment: build
     needs:
       - build-caa-image
       - build-podvm-image
@@ -175,8 +173,8 @@ jobs:
 
     - name: Remove podvm image
       run: |
-        az sig image-version delete --gallery-name ${{ env.PODVM_GALLERY_NAME }} \
-                                    --gallery-image-definition ${{ env.PODVM_IMAGE_DEF_NAME }} \
+        az sig image-version delete --gallery-name ${{ secrets.AZURE_PODVM_GALLERY_NAME }} \
+                                    --gallery-image-definition ${{ secrets.AZURE_PODVM_IMAGE_DEF_NAME }} \
                                     --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
                                     --gallery-image-version ${{ env.PODVM_IMAGE_VERSION }}
         az image delete --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \

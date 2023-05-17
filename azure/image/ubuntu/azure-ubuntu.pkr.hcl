@@ -1,5 +1,5 @@
 source "azure-arm" "ubuntu" {
-  client_id                         = "${var.client_id}"
+  use_azure_cli_auth                = true
   vm_size                           = "${var.vm_size}"
   os_type                           = "Linux"
   image_publisher                   = "${var.publisher}"
